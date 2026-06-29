@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>The Corner Café — Menu</title>
+  <link id="fontLink" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="header">
+      <div class="header-top">
+        <div class="brand">
+          <div class="logo" id="logo">CC</div>
+          <div class="brand-text">
+            <h1 id="restaurantName">The Corner Café</h1>
+            <p class="tagline" id="tagline">Fresh coffee & homemade food</p>
+          </div>
+        </div>
+        <button class="cart-btn" id="cartBtn" aria-label="View cart">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+          </svg>
+          <span class="cart-count" id="cartCount">0</span>
+        </button>
+      </div>
+
+      <div class="table-badge" id="tableBadge">
+        <span class="table-badge-label">Ordering from</span>
+        <span class="table-badge-value" id="tableDisplay"></span>
+      </div>
+
+      <nav class="categories" id="categories"></nav>
+    </header>
+
+    <main class="menu" id="menu"></main>
+
+    <footer class="footer">
+      <p>Powered by <strong>Tapslow</strong></p>
+      <p class="footer-note">Tap to order · Apple Pay, Google Pay, card, or pay at counter</p>
+    </footer>
+  </div>
+
+  <div class="overlay" id="overlay"></div>
+  <aside class="cart-panel" id="cartPanel">
+    <div class="cart-header">
+      <h2>Your order</h2>
+      <button class="close-btn" id="closeCart" aria-label="Close cart">&times;</button>
+    </div>
+    <div class="cart-location" id="cartLocation"></div>
+    <ul class="cart-items" id="cartItems">
+      <li class="cart-empty">Your cart is empty</li>
+    </ul>
+    <div class="cart-footer">
+      <div class="cart-total">
+        <span>Total</span>
+        <span id="cartTotal">£0.00</span>
+      </div>
+      <div class="payment-options">
+        <button type="button" class="pay-btn pay-online" id="payOnline" disabled>
+          <span class="pay-label">Order</span>
+          <span class="pay-badge">Secure checkout · Apple Pay, Google Pay, or card</span>
+        </button>
+        <button type="button" class="pay-btn pay-counter" id="payCounter" disabled>
+          <span class="pay-label">Pay at counter</span>
+          <span class="pay-badge">Cash or card · no online checkout</span>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="payment-modal" id="paymentModal" aria-hidden="true">
+    <div class="payment-sheet" role="dialog" aria-labelledby="paymentTitle">
+      <div class="payment-header">
+        <button type="button" class="payment-back" id="paymentBack" aria-label="Back to cart">&larr;</button>
+        <h2 id="paymentTitle">Secure checkout</h2>
+        <button type="button" class="close-btn" id="closePayment" aria-label="Close checkout">&times;</button>
+      </div>
+
+      <div class="payment-summary">
+        <span>Order total</span>
+        <strong id="paymentTotal">£0.00</strong>
+      </div>
+
+      <div class="wallet-section">
+        <p class="payment-section-label">Express checkout</p>
+        <button type="button" class="wallet-btn apple-pay" id="applePayBtn">
+          <span class="wallet-icon" aria-hidden="true"></span>
+          <span>Pay with Apple Pay</span>
+        </button>
+        <button type="button" class="wallet-btn google-pay" id="googlePayBtn">
+          <span class="wallet-icon" aria-hidden="true"></span>
+          <span>Pay with Google Pay</span>
+        </button>
+        <p class="wallet-note" id="walletNote"></p>
+      </div>
+
+      <div class="payment-divider"><span>or pay with card</span></div>
+
+      <form class="card-form" id="cardForm" novalidate>
+        <p class="payment-section-label">Card type</p>
+        <div class="card-type-row" id="cardTypeRow">
+          <button type="button" class="card-type-btn active" data-brand="visa" aria-pressed="true">Visa</button>
+          <button type="button" class="card-type-btn" data-brand="mastercard" aria-pressed="false">Mastercard</button>
+          <button type="button" class="card-type-btn" data-brand="amex" aria-pressed="false">Amex</button>
+          <button type="button" class="card-type-btn" data-brand="maestro" aria-pressed="false">Maestro</button>
+        </div>
+
+        <label class="field-label" for="cardName">Name on card</label>
+        <input class="field-input" type="text" id="cardName" name="cardName" autocomplete="cc-name" placeholder="As shown on card" required>
+
+        <label class="field-label" for="cardNumber">Card number</label>
+        <input class="field-input" type="text" id="cardNumber" name="cardNumber" inputmode="numeric" autocomplete="cc-number" placeholder="1234 5678 9012 3456" required>
+
+        <div class="field-row">
+          <div>
+            <label class="field-label" for="cardExpiry">Expiry</label>
+            <input class="field-input" type="text" id="cardExpiry" name="cardExpiry" inputmode="numeric" autocomplete="cc-exp" placeholder="MM / YY" required>
+          </div>
+          <div>
+            <label class="field-label" for="cardCvv">CVV</label>
+            <input class="field-input" type="password" id="cardCvv" name="cardCvv" inputmode="numeric" autocomplete="cc-csc" placeholder="123" required>
+          </div>
+        </div>
+
+        <p class="field-error hidden" id="cardError" role="alert"></p>
+
+        <button type="submit" class="pay-btn pay-card-submit" id="payCardBtn">
+          <span class="pay-label">Pay with card</span>
+          <span class="pay-badge" id="payCardAmount">£0.00</span>
+        </button>
+      </form>
+
+      <p class="payment-secure-note">Payments are processed securely. Card details are validated on this device for demo checkout.</p>
+    </div>
+  </div>
+
+  <div class="payment-modal" id="counterModal" aria-hidden="true">
+    <div class="payment-sheet" role="dialog" aria-labelledby="counterTitle">
+      <div class="payment-header">
+        <button type="button" class="payment-back" id="counterBack" aria-label="Back to cart">&larr;</button>
+        <h2 id="counterTitle">Pay at counter</h2>
+        <button type="button" class="close-btn" id="closeCounter" aria-label="Close confirmation">&times;</button>
+      </div>
+
+      <div class="payment-summary">
+        <span>Order total</span>
+        <strong id="counterTotal">£0.00</strong>
+      </div>
+
+      <p class="payment-section-label">Collection point</p>
+      <p class="counter-location" id="counterLocation"></p>
+
+      <p class="payment-section-label">Your items</p>
+      <ul class="cart-items counter-items" id="counterItems"></ul>
+
+      <p class="counter-note">Pay with cash or card when you collect your order. Nothing is charged online.</p>
+
+      <button type="button" class="pay-btn pay-counter" id="confirmCounterBtn">
+        <span class="pay-label">Send order to kitchen</span>
+        <span class="pay-badge" id="confirmCounterAmount">£0.00</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="payment-modal order-success-modal" id="counterSuccessModal" aria-hidden="true">
+    <div class="payment-sheet order-success-sheet" role="dialog" aria-labelledby="counterSuccessTitle">
+      <div class="order-success-body">
+        <p class="order-success-eyebrow">Order sent to kitchen</p>
+        <h2 id="counterSuccessTitle" class="visually-hidden">Your order number</h2>
+        <p class="order-success-label">Your order number</p>
+        <p class="order-success-number" id="counterOrderNumber" aria-live="polite">#000</p>
+        <p class="order-success-hint">Show this number when you pay at the counter.</p>
+        <div class="order-success-details">
+          <span id="counterSuccessLocation"></span>
+          <span id="counterSuccessTotal"></span>
+        </div>
+        <button type="button" class="pay-btn pay-online" id="counterSuccessDone">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="payment-processing" id="paymentProcessing" aria-live="polite">
+    <div class="payment-spinner" aria-hidden="true"></div>
+    <p id="paymentProcessingText">Processing payment…</p>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app.js"></script>
+</body>
+</html>
