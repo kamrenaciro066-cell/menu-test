@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tapflow — Kitchen Monitor</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="orders-sync.js"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap">
+  <style>
+    :root {
+      --bg: #ffffff;
+      --surface: #ffffff;
+      --text: #1a2e28;
+      --text-muted: #6b7c76;
+      --green: #264d3d;
+      --green-light: #3d6b58;
+      --mint: #b8e0d2;
+      --orange: #d4a574;
+      --orange-light: #f5e6d3;
+      --border: #e0ddd6;
+      --shadow: 0 2px 12px rgba(38, 77, 61, 0.08);
+      --warn: #b45309;
+      --error: #dc2626;
+    }
+
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      min-height: 100vh;
+    }
+
+    .kitchen-header {
+      padding: 24px 24px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    h1 {
+      color: var(--green);
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    .status {
+      font-size: 0.9em;
+      color: var(--text-muted);
+      margin: 8px 0 0;
+    }
+
+    .status.live { color: var(--green-light); font-weight: 600; }
+    .status.warn { color: var(--warn); }
+    .status.error { color: var(--error); }
+
+    #order-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      padding: 24px;
+    }
+
+    .empty-state {
+      color: var(--text-muted);
+      font-size: 1.05em;
+      padding: 40px 0;
+    }
+
+    .order-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      width: 280px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      animation: popIn 0.35s ease-out;
+    }
+
+    .order-card.new-order {
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px rgba(38, 77, 61, 0.12), var(--shadow);
+    }
+
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(0.92) translateY(-8px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .order-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-weight: 600;
+      font-size: 1.05em;
+      color: var(--green);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+      margin-bottom: 10px;
+    }
+
+    .order-number {
+      font-size: 1.35em;
+      letter-spacing: 0.02em;
+    }
+
+    .order-items {
+      font-size: 1rem;
+      line-height: 1.55;
+      color: var(--text);
+      min-height: 60px;
+    }
+
+    .order-payment {
+      font-size: 0.82em;
+      color: #8b5e34;
+      background: var(--orange-light);
+      border: 1px solid var(--orange);
+      border-radius: 6px;
+      padding: 4px 8px;
+      margin-bottom: 10px;
+      font-weight: 600;
+      display: inline-block;
+    }
+
+    .order-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85em;
+      color: var(--text-muted);
+      margin-top: 10px;
+      margin-bottom: 12px;
+    }
+
+    .order-total {
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .complete-btn {
+      width: 100%;
+      padding: 11px;
+      background: var(--mint);
+      color: var(--green);
+      border: none;
+      border-radius: 8px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 0.95em;
+      font-family: inherit;
+      transition: background 0.2s, transform 0.15s;
+    }
+
+    .complete-btn:hover { background: #a8d4c4; }
+    .complete-btn:active { transform: scale(0.98); }
+    .complete-btn:disabled { opacity: 0.6; cursor: wait; }
+  </style>
+</head>
+<body>
+  <header class="kitchen-header">
+    <h1>Corner Café — Kitchen Orders</h1>
+    <p class="status" id="status">Connecting…</p>
+  </header>
+  <div id="order-container">
+    <p class="empty-state" id="emptyState">Waiting for orders…</p>
+  </div>
+
+  <script>
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const container = document.getElementById('order-container');
+    const emptyState = document.getElementById('emptyState');
+    const statusEl = document.getElementById('status');
+    const seenOrderKeys = new Set();
+
+    function formatTableLabel(tableNumber) {
+      return tableNumber === 0 ? 'Counter' : `Table ${tableNumber}`;
+    }
+
+    function formatOrderNumber(order) {
+      if (order.order_num) return `#${order.order_num}`;
+      return `#${String(order.id).padStart(3, '0')}`;
+    }
+
+    function formatPrice(amount) {
+      return `£${Number(amount).toFixed(2)}`;
+    }
+
+    function formatItems(items) {
+      return items.split('\n').filter(Boolean).map(item => `<div>${item}</div>`).join('');
+    }
+
+    function orderKey(order) {
+      return String(order.id);
+    }
+
+    function updateEmptyState() {
+      const hasCards = container.querySelector('.order-card');
+      emptyState.hidden = Boolean(hasCards);
+    }
+
+    function renderOrderCard(order, isNew = false) {
+      const key = orderKey(order);
+      if (seenOrderKeys.has(key) || document.getElementById(`order-${key}`)) return;
+      seenOrderKeys.add(key);
+
+      const timeSource = order.created_at ? new Date(order.created_at) : new Date();
+      const time = timeSource.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const localOnly = Boolean(order.localOnly);
+
+      const paymentLabel = order.payment_method
+        ? `<div class="order-payment">${order.payment_method}</div>`
+        : '';
+
+      const card = document.createElement('div');
+      card.className = `order-card${isNew ? ' new-order' : ''}`;
+      card.id = `order-${key}`;
+      card.dataset.localOnly = localOnly ? 'true' : 'false';
+      card.innerHTML = `
+        <div>
+          <div class="order-header">
+            <span>${formatTableLabel(order.table_number)}</span>
+            <span class="order-number">${formatOrderNumber(order)}</span>
+          </div>
+          ${paymentLabel}
+          <div class="order-items">${formatItems(order.items)}</div>
+        </div>
+        <div>
+          <div class="order-meta">
+            <span>${time}</span>
+            <span class="order-total">${formatPrice(order.total_price)}</span>
+          </div>
+          <button class="complete-btn" type="button">Complete order</button>
+        </div>
+      `;
+
+      card.querySelector('.complete-btn').addEventListener('click', () => completeOrder(order, card));
+      container.prepend(card);
+      updateEmptyState();
+
+      if (isNew) {
+        setTimeout(() => card.classList.remove('new-order'), 2000);
+      }
+    }
+
+    async function loadExistingOrders() {
+      const { data: orders, error } = await supabaseClient
+        .from('orders')
+        .select('*')
+        .eq('status', 'Pending')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      orders.forEach(order => renderOrderCard(order));
+      return true;
+    }
+
+    async function completeOrder(order, card) {
+      const btn = card.querySelector('.complete-btn');
+      btn.disabled = true;
+      btn.textContent = 'Completing…';
+
+      const localOnly = card.dataset.localOnly === 'true';
+
+      if (!localOnly) {
+        const { error } = await supabaseClient
+          .from('orders')
+          .update({ status: 'Completed' })
+          .eq('id', order.id);
+
+        if (error) {
+          console.error('Error updating order:', error);
+          btn.disabled = false;
+          btn.textContent = 'Complete order';
+          alert('Could not complete order: ' + error.message);
+          return;
+        }
+      }
+
+      seenOrderKeys.delete(orderKey(order));
+      card.remove();
+      updateEmptyState();
+    }
+
+    async function pollForOrders() {
+      try {
+        await loadExistingOrders();
+      } catch (err) {
+        console.warn('Order poll failed:', err);
+      }
+    }
+
+    async function initKitchen() {
+      let dbOk = false;
+
+      try {
+        dbOk = await loadExistingOrders();
+      } catch (err) {
+        console.warn('Could not load orders from database:', err);
+      }
+
+      subscribeToKitchenOrders(supabaseClient, {
+        onBroadcast: order => renderOrderCard(order, true),
+        onInsert: order => {
+          if (order.status === 'Pending') renderOrderCard(order, true);
+        },
+        onStatus: status => {
+          if (status === 'SUBSCRIBED') {
+            if (dbOk) {
+              statusEl.textContent = 'Live — new orders appear instantly';
+              statusEl.className = 'status live';
+            } else {
+              statusEl.textContent = 'Live — receiving orders (run supabase-setup.sql in Supabase to save to database)';
+              statusEl.className = 'status warn';
+            }
+          } else if (status === 'CHANNEL_ERROR') {
+            statusEl.textContent = 'Connection error — refresh the page';
+            statusEl.className = 'status error';
+          }
+        },
+      });
+
+      updateEmptyState();
+      setInterval(pollForOrders, 4000);
+    }
+
+    initKitchen();
+  </script>
+</body>
+</html>
